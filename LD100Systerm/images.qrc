@@ -1,0 +1,15 @@
+<RCC>
+    <qresource prefix="/">
+        <file>images/clear.png</file>
+        <file>images/comset.png</file>
+        <file>images/connect.png</file>
+        <file>images/delete.png</file>
+        <file>images/failure.png</file>
+        <file>images/help.png</file>
+        <file>images/mainicon.png</file>
+        <file>images/preview.png</file>
+        <file>images/print.png</file>
+        <file>images/set.png</file>
+        <file>images/success.png</file>
+    </qresource>
+</RCC>
