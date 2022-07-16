@@ -23,7 +23,7 @@ DialogOne::~DialogOne()
 
 void DialogOne::imageShow()
 {
-    ui->labelShow->setPixmap(QPixmap::fromImage(myQImg.scaled(ui->labelShow->size(), Qt::KeepAspectRatio)));
+    ui->labelShow->setPixmap(QPixmap::fromImage(myQImg));
 }
 
 void DialogOne::imgProc(float con, int bri)
