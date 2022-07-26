@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include"dialogone.h"
+#include"dialogtwo.h"
 
 #include <QMainWindow>
 #include<QDebug>
@@ -21,8 +22,11 @@ public:
 private slots:
     void on_btnDemo1_clicked();
 
+    void on_btnDemo2_clicked();
+
 private:
     Ui::MainWindow *ui;
     DialogOne *DemoOne;
+    DialogTwo *DemoTwo;
 };
 #endif // MAINWINDOW_H

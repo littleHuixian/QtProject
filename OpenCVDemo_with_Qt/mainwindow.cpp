@@ -18,3 +18,10 @@ void MainWindow::on_btnDemo1_clicked()
     DemoOne->show();
 }
 
+
+void MainWindow::on_btnDemo2_clicked()
+{
+    DemoTwo = new DialogTwo();
+    DemoTwo->show();
+}
+

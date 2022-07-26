@@ -10,15 +10,18 @@ CONFIG += c++11
 
 SOURCES += \
     dialogone.cpp \
+    dialogtwo.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     dialogone.h \
+    dialogtwo.h \
     mainwindow.h
 
 FORMS += \
     dialogone.ui \
+    dialogtwo.ui \
     mainwindow.ui
 
 # Default rules for deployment.

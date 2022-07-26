@@ -20,12 +20,12 @@ DialogOne::~DialogOne()
 {
     delete ui;
 }
-
+//显示图片
 void DialogOne::imageShow()
 {
     ui->labelShow->setPixmap(QPixmap::fromImage(myQImg));
 }
-
+//图像增强处理，接受参数分别为对比度和亮度系数
 void DialogOne::imgProc(float con, int bri)
 {
     Mat imgSrc = myImg;
@@ -34,7 +34,7 @@ void DialogOne::imgProc(float con, int bri)
     myQImg = QImage((const unsigned char*)(imgDst.data), imgDst.cols, imgDst.rows, QImage::Format_RGB888);
     imageShow();
 }
-
+//对比度
 void DialogOne::on_contrastVerticalSlider_sliderMoved(int position)
 {
     imgProc(position / 33.3, 0);
@@ -46,7 +46,7 @@ void DialogOne::on_contrastVerticalSlider_valueChanged(int value)
     imgProc(value / 33.3, 0);
 }
 
-
+//亮度
 void DialogOne::on_brightnessVerticalSlider_sliderMoved(int position)
 {
     imgProc(1.0, position);
