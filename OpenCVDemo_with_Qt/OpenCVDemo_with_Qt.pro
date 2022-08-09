@@ -10,17 +10,20 @@ CONFIG += c++11
 
 SOURCES += \
     dialogone.cpp \
+    dialogthree.cpp \
     dialogtwo.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     dialogone.h \
+    dialogthree.h \
     dialogtwo.h \
     mainwindow.h
 
 FORMS += \
     dialogone.ui \
+    dialogthree.ui \
     dialogtwo.ui \
     mainwindow.ui
 

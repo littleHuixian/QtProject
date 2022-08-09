@@ -25,3 +25,10 @@ void MainWindow::on_btnDemo2_clicked()
     DemoTwo->show();
 }
 
+
+void MainWindow::on_btnDemo3_clicked()
+{
+    DemoThree = new DialogThree();
+    DemoThree->show();
+}
+

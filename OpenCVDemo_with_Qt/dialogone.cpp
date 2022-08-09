@@ -8,6 +8,7 @@ DialogOne::DialogOne(QWidget *parent) :  QDialog(parent), ui(new Ui::DialogOne)
     //load images
     Mat image = imread("E:/QtProjectFiles/opencvTest/1.jpg");
 
+    //cvtColor( InputArray src, OutputArray dst, int code, int dstCn = 0 );
     cvtColor(image, image, COLOR_BGR2RGB);   //Mat的图片是BGR格式，需要先转换为RGB格式
     myImg = image;
     //在窗口控件中显示图片
@@ -44,6 +45,7 @@ void DialogOne::on_contrastVerticalSlider_sliderMoved(int position)
 void DialogOne::on_contrastVerticalSlider_valueChanged(int value)
 {
     imgProc(value / 33.3, 0);
+    ui->labelValue1->setText(QString("%1").arg(value));
 }
 
 //亮度
@@ -56,5 +58,6 @@ void DialogOne::on_brightnessVerticalSlider_sliderMoved(int position)
 void DialogOne::on_brightnessVerticalSlider_valueChanged(int value)
 {
     imgProc(1.0, value);
+    ui->labelValue2->setText(QString("%1").arg(value));
 }
 

@@ -3,6 +3,7 @@
 
 #include"dialogone.h"
 #include"dialogtwo.h"
+#include"dialogthree.h"
 
 #include <QMainWindow>
 #include<QDebug>
@@ -24,9 +25,12 @@ private slots:
 
     void on_btnDemo2_clicked();
 
+    void on_btnDemo3_clicked();
+
 private:
     Ui::MainWindow *ui;
     DialogOne *DemoOne;
     DialogTwo *DemoTwo;
+    DialogThree *DemoThree;
 };
 #endif // MAINWINDOW_H
