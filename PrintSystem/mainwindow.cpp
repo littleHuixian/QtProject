@@ -1,0 +1,465 @@
+﻿#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+
+    this->setWindowTitle(tr("打印系统"));
+    this->setFixedSize(1090, 600);
+    currentTime = QDateTime::currentDateTime();
+
+    infoLabel = new QLabel;
+    infoLabel->setMinimumWidth(200);
+    ui->statusbar->addWidget(infoLabel);
+
+    ui->lineEditIp->setText(tr("152.16.17.134"));
+    ui->lineEditPort->setText(tr("8089"));
+    ui->comboBox->setCurrentIndex(0);
+    ui->lineEditTitle->setText(tr("检验报告"));
+
+    tcpSocket = new QTcpSocket(this);
+    tcpServer = new QTcpServer(this);
+
+    initTable();
+    readConfig();
+
+    connect(tcpServer, &QTcpServer::newConnection, this, &MainWindow::newChannel);
+
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+void MainWindow::initTable()
+{
+    ui->tableWidget->setRowCount(3);
+    ui->tableWidget->setColumnCount(5);
+    ui->tableWidget->setHorizontalHeaderLabels(QStringList()<<tr("项目")<<tr("结果")<<tr("范围")<<tr("单位")<<tr("备注"));
+
+    QHeaderView *headerView = ui->tableWidget->horizontalHeader();
+
+    headerView->setStyleSheet("QHeaderView::section {background-color: rgb(85, 170, 255)}");
+
+    ui->tableWidget->verticalHeader()->setVisible(false);
+    ui->tableWidget->horizontalHeader()->setStretchLastSection(true);
+    ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch); //使列完全填充并平分
+    ui->tableWidget->setAlternatingRowColors(true);     //设置隔行变颜色
+}
+
+void MainWindow::readConfig()
+{
+    //创建配置文件，读取配置
+    configFilePath = qApp->applicationDirPath()+"/localconfig.ini";
+    if(!QFile::exists(configFilePath)){
+        QSettings configIniWrite(configFilePath, QSettings::IniFormat);
+
+        configIniWrite.beginGroup("NET_SET");
+        configIniWrite.setValue("IP_SET", "152.16.17.134");
+        configIniWrite.setValue("PORT_SET", 8089);
+        configIniWrite.endGroup();
+
+        configIniWrite.beginGroup("PRINT_SET");
+        //1对应A4纸张，2对应A5纸张
+        configIniWrite.setValue("PAGE_SIZE", 0);
+        configIniWrite.setValue("PRINT_TITLE", "检验报告单");
+        configIniWrite.endGroup();
+
+    }
+
+    QSettings *configFileRead = new QSettings(configFilePath, QSettings::IniFormat);
+    //将读取到的ini文件保存在QString中，先取值，然后通过toString()函数转换成QString类型
+    setAddr = configFileRead->value("NET_SET/IP_SET").toString();
+    setPort = configFileRead->value("NET_SET/PORT_SET").toInt();
+
+    paperSize = configFileRead->value("PRINT_SET/PAGE_SIZE").toInt();
+    printTitle = configFileRead->value("PRINT_SET/PRINT_TITLE").toString();
+}
+
+void MainWindow::on_btnLink_clicked()
+{
+    if(ui->lineEditIp->text().isEmpty()|| ui->lineEditPort->text().isEmpty()){
+        ui->labelInfo->setText(tr("IP地址或端口为空！"));
+        QMessageBox::information(this, tr("警告"), tr("IP地址或端口为空！"), QMessageBox::Ok);
+        return;
+    }
+
+    qDebug()<<setAddr<<setPort;
+    if (ui->btnLink->text() == "未连接"){
+
+        QHostAddress addr(setAddr);
+        tcpServer->listen(addr, setPort);
+
+        infoLabel->setText(tr("connect success!"));
+        ui->labelInfo->setText(tr("已连接"));
+        ui->btnLink->setText(tr("已连接"));
+
+    } else {
+        //断开连接
+        tcpSocket->disconnectFromHost();
+        tcpServer->close();
+        ui->labelInfo->setText(tr("未连接"));
+        ui->btnLink->setText(tr("未连接"));
+
+    }
+
+}
+
+void MainWindow::newChannel()
+{
+    //取出建立好连接的套接字
+    tcpSocket = tcpServer->nextPendingConnection();
+    //获取对方的ip端口
+    connect(tcpSocket, &QTcpSocket::readyRead, this, &MainWindow::readBufferData);
+    connect(tcpSocket, &QTcpSocket::disconnected, tcpSocket, &QTcpSocket::deleteLater);
+}
+
+void MainWindow::readBufferData()
+{
+    QString jsonString;
+    while (tcpSocket->bytesAvailable() > 0) {
+        //jsonBuffer.append( tcpSocket->readAll() );
+        jsonString.append( QString::fromLocal8Bit(tcpSocket->readAll()) );
+
+    }
+
+    QByteArray jsonBuffer = jsonString.toUtf8();
+    parseJsonData(jsonBuffer);
+    //显示接收的数据信息
+    int ReceiveCount=jsonBuffer.length();
+
+    //QString timeStr = currentSystemTime.toString("hh:mm:ss");
+    QString timeStr = currentTime.toString("yyyy-MM-dd hh:mm:ss");
+    infoLabel->setText( timeStr + tr(" 接收：%1 字节").arg(ReceiveCount) );
+    qDebug()<<"jsonBuffer:"<<timeStr<<QString::fromUtf8(jsonBuffer);
+    //jsonBuffer.clear();
+
+}
+
+void MainWindow::parseJsonData(QByteArray jsonData)
+{
+    QJsonParseError errorInfo;
+    //字符串格式化为Json
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData, &errorInfo);
+    //qDebug()<<"jsonDoc"<<jsonDoc;
+
+    if(errorInfo.error != QJsonParseError::NoError){
+        infoLabel->setText(tr("Json数据格式错误！"));
+        return;
+
+    } else {
+        QJsonObject rootObj = jsonDoc.object();
+
+        QString dateId = rootObj.value("date_id").toString();
+        QString sampleId = rootObj.value("smpl_id").toString();
+        QString name = rootObj.value("name").toString();
+        QString age = rootObj.value("age").toString();
+        QString sex = rootObj.value("sex").toString();
+        QString itemName = rootObj.value("item_name").toString();
+        QString note = rootObj.value("note").toString();
+        QString sampleType = rootObj.value("smpl_type").toString();
+        QString testTime = rootObj.value("testing_time").toString();
+        QString sendDoctor = rootObj.value("sending_doctor").toString();
+        QString sendDepartment = rootObj.value("sending_doc_dept").toString();
+        QString mechinNum = rootObj.value("SN").toString();
+        //qDebug()<<"receive data"<<dateId<<sampleId<<name<<age<<sex<<itemName<<note<<sampleType;
+
+        //detail值
+        QJsonValue detailResult = rootObj.value("detail");
+        if(detailResult.isArray()){
+            for(int index = 0; index < 3; index++){
+                QJsonObject detailObj = detailResult.toArray().at(index).toObject();
+
+                QString itemValue = detailObj.value("item").toString();
+                QString resultValue = detailObj.value("result").toString();
+                QString unitValue = detailObj.value("unit").toString();
+                QString rangeValue = detailObj.value("range").toString();
+                QString noteValue = detailObj.value("note").toString();
+                //qDebug()<<itemValue<<resultValue<<unitValue<<rangeValue<<noteValue;
+
+                QTableWidgetItem *item0 = new QTableWidgetItem(itemValue);
+                ui->tableWidget->setItem(index, 0, item0);
+                QTableWidgetItem *item1 = new QTableWidgetItem(resultValue);
+                ui->tableWidget->setItem(index, 1, item1);
+                QTableWidgetItem *item2 = new QTableWidgetItem(unitValue);
+                ui->tableWidget->setItem(index, 2, item2);
+                QTableWidgetItem *item3 = new QTableWidgetItem(rangeValue);
+                ui->tableWidget->setItem(index, 3, item3);
+                QTableWidgetItem *item4 = new QTableWidgetItem(noteValue);
+                ui->tableWidget->setItem(index, 4, item4);
+            }
+        }
+
+        ui->lineEdit1->setText(name);
+        if(sex == "男"){
+            ui->comboBox2->setCurrentIndex(0);
+
+        }else {
+            ui->comboBox2->setCurrentIndex(1);
+
+        }
+        ui->lineEdit3->setText(age);
+        ui->lineEdit4->setText(dateId);
+        ui->lineEdit5->setText(itemName);
+        ui->lineEdit6->setText(sampleId);
+        ui->lineEdit7->setText(sampleType);
+        ui->lineEdit8->setText(testTime);
+        ui->lineEdit9->setText(sendDoctor);
+        ui->lineEdit10->setText(sendDepartment);
+
+        ui->lineEdit11->setText(note);
+
+    }
+}
+
+//void MainWindow::socketDisconnected()
+//{
+
+//}
+
+void MainWindow::on_btnPreview_clicked()
+{
+    QPrinter printer(QPrinter::ScreenResolution);
+    printer.setPageMargins(30, 30, 30, 30, QPrinter::DevicePixel);
+     // 自定义纸张大小
+    //printer.setPageSize(QPrinter::Custom);
+    paperSize = ui->comboBox->currentIndex();
+
+    if(paperSize == 0){
+        printer.setPaperSize(QPrinter::A4);
+        printer.setOrientation(QPrinter::Portrait);  //设置纸张纵向
+
+        // 创建 QPrintPreviewDialog 对象，并设置打印预览参数
+        QPrintPreviewDialog preview(&printer, this);
+        preview.setMinimumSize(QSize(700, 900));
+
+        // 连接打印预览信号
+        connect(&preview, SIGNAL(paintRequested(QPrinter*)), SLOT(printA4Slot(QPrinter*)));
+
+        // 显示打印预览对话框
+        preview.exec ();
+
+    } else {
+        printer.setPaperSize(QPrinter::A5);
+        printer.setOrientation(QPrinter::Landscape);  //设置纸张横向
+        QPrintPreviewDialog preview(&printer, this);
+        preview.setMinimumSize(QSize(1000, 800));
+
+        connect(&preview, SIGNAL(paintRequested(QPrinter*)), SLOT(printA5Slot(QPrinter*)));
+        preview.exec ();
+    }
+}
+
+
+void MainWindow::on_btnPrint_clicked()
+{
+//    int selectRow = ui->tableWidget->currentIndex().row();
+//    if (selectRow < 0){
+//        QMessageBox::information(this, tr("警告"), tr("请先选择打印数据"), QMessageBox::Ok);
+//        return;
+//    }
+
+    paperSize = ui->comboBox->currentIndex();
+
+    QPrinter printer(QPrinter::ScreenResolution);
+    printer.setPageMargins(30, 30, 30, 30, QPrinter::DevicePixel);  //设置页边距
+    if(paperSize == 0){
+        printer.setPaperSize(QPrinter::A4);
+        printer.setOrientation(QPrinter::Portrait);  //设置纸张纵向
+
+        if(QPrintDialog(&printer).exec() == QDialog::Accepted){
+            printA4Slot(&printer);
+        }
+
+    } else {
+        printer.setPaperSize(QPrinter::A5);
+        printer.setOrientation(QPrinter::Landscape);  //设置纸张横向
+        if(QPrintDialog(&printer).exec() == QDialog::Accepted){
+            printA5Slot(&printer);
+        }
+    }
+}
+
+void MainWindow::printA4Slot(QPrinter *printerPixmap)
+{
+    QPainter painter;
+    painter.begin(printerPixmap);
+    QRectF pageRect = printerPixmap->pageRect(QPrinter::Millimeter);
+    int widthPixle = int(printerPixmap->resolution() * (pageRect.width() / 25.4));
+    int heightPixle = int(printerPixmap->resolution() * (pageRect.height() / 25.4));
+    painter.setViewport(0, 0, widthPixle, heightPixle);
+//    qDebug()<<"width"<<"height"<<widthPixle<<heightPixle;
+    QPen penBlack(Qt::black);  //画笔颜色
+    painter.setPen(penBlack);
+//    painter.drawRoundedRect(0, 0, widthPixle, heightPixle, 30, 30);
+
+    QFont font;
+    //标题
+    font.setFamily("Microsoft YaHei");
+    font.setPixelSize(32);
+    painter.setFont(font);
+    painter.drawText(20, 20, widthPixle, 100, Qt::AlignCenter, printTitle);
+
+    font.setFamily("Bahnschrift");     //Microsoft YaHei
+    font.setPixelSize(14);
+    painter.setFont(font);
+
+    painter.drawText(  60, 160, "姓   名："+ui->lineEdit1->text());
+    painter.drawText(300, 160, "性   别："+ui->comboBox2->currentText());
+    painter.drawText(500, 160, "年   龄："+ui->lineEdit3->text());
+
+    painter.drawText(60,   200, "日   期："+ui->lineEdit4->text());
+    painter.drawText(300, 200, "测试时间："+ui->lineEdit8->text());
+
+    painter.drawText(60, 240, "项   目："+ui->lineEdit5->text());
+    painter.drawText(300, 240, "样本号："+ui->lineEdit6->text());
+    painter.drawText(500,   240, "样本类型："+ui->lineEdit7->text());
+
+    painter.drawText(60, 280, "备  注："+ui->lineEdit12->text());
+
+    painter.drawLine(20, 340, 700, 340);    //分割线
+
+    painter.drawText(500, 790, "*本结果仅供临床参考*");
+    painter.drawLine(20, 800, 700, 800);     //分割线
+
+    painter.drawText(  60, 820, "送检医生："+ui->lineEdit9->text());
+    painter.drawText(300, 820, "送检部门："+ui->lineEdit10->text());
+    painter.drawText(500, 820, "审 核 者："+ui->lineEdit11->text());
+
+    //内容标题
+    font.setFamily("Microsoft YaHei");
+//    font2.setPixelSize(20);
+    painter.drawText(  90, 380, "检测项目");
+    painter.drawText(200, 380, "结果");
+    painter.drawText(300, 380, "参考区间");
+    painter.drawText(400, 380, "单位");
+    painter.drawText(500, 380, "备注");
+
+    //判断表格是否空值 并打印
+    for (int row = 0; row < ui->tableWidget->rowCount(); row++) {
+        for (int col = 0; col < ui->tableWidget->columnCount(); col++) {
+            QTableWidgetItem* itemStr = ui->tableWidget->item(row, col);
+
+            if (itemStr != nullptr && !itemStr->text().isEmpty()){
+                painter.drawText(100 + 100*col, 410 + 30*row, itemStr->text());
+
+            }
+        }
+    }
+
+    painter.end();
+}
+
+void MainWindow::printA5Slot(QPrinter *printerPixmap)
+{
+    QPainter painter;
+    painter.begin(printerPixmap);
+    QRectF pageRect = printerPixmap->pageRect(QPrinter::Millimeter);
+    int widthPixle = int(printerPixmap->resolution() * (pageRect.width() / 25.4));
+    int heightPixle = int(printerPixmap->resolution() * (pageRect.height() / 25.4));
+
+    painter.setViewport(0, 0, widthPixle, heightPixle);
+
+    QPen penBlack(Qt::black);  //画笔颜色
+    painter.setPen(penBlack);
+//    painter.drawRoundedRect(0, 0, widthPixle, heightPixle, 30, 30);
+
+    QFont font;
+    //标题
+    font.setFamily("Microsoft YaHei");
+    font.setPixelSize(32);
+    painter.setFont(font);
+    painter.drawText(0, 0, widthPixle, 50, Qt::AlignCenter, printTitle);
+
+    font.setFamily("Bahnschrift");     //Microsoft YaHei
+    font.setPixelSize(14);
+    painter.setFont(font);
+
+    painter.drawText(  60, 80, "姓  名："+ui->lineEdit1->text());
+    painter.drawText(300, 80, "性  别："+ui->comboBox2->currentText());
+    painter.drawText(500, 80, "年  龄："+ui->lineEdit3->text());
+
+    painter.drawText(  60, 110, "日  期："+ui->lineEdit4->text());
+    painter.drawText(300, 110, "测试时间："+ui->lineEdit8->text());
+
+    painter.drawText(  60, 140, "项  目："+ui->lineEdit5->text());
+    painter.drawText(300, 140, "样本号："+ui->lineEdit6->text());
+    painter.drawText(500, 140, "样本类型："+ui->lineEdit7->text());
+
+    painter.drawText(  60, 170, "备  注："+ui->lineEdit12->text());
+    painter.drawLine(20, 190, 700, 190);    //分割线
+
+    painter.drawText(460, 390, "*本结果仅供临床参考*");
+    painter.drawLine(20, 400, 700, 400);     //分割线
+
+    painter.drawText(  60, 420, "送检医生："+ui->lineEdit9->text());
+    painter.drawText(300, 420, "送检部门："+ui->lineEdit10->text());
+    painter.drawText(500, 420, "审 核 者："+ui->lineEdit11->text());
+
+    //内容标题
+    font.setFamily("Microsoft YaHei");
+    font.setPixelSize(16);
+    painter.drawText(  90, 220, "检测项目");
+    painter.drawText(200, 220, "结果");
+    painter.drawText(300, 220, "参考区间");
+    painter.drawText(400, 220, "单位");
+    painter.drawText(500, 220, "备注");
+
+    //判断表格是否空值 并打印
+    for (int row = 0; row < ui->tableWidget->rowCount(); row++) {
+        for (int col = 0; col < ui->tableWidget->columnCount(); col++) {
+            QTableWidgetItem* itemStr = ui->tableWidget->item(row, col);
+
+            if (itemStr != nullptr && !itemStr->text().isEmpty()){
+                painter.drawText(100 + 100*col, 240 + 30*row, itemStr->text());
+
+            }
+        }
+    }
+
+    painter.end();
+}
+
+void MainWindow::on_btnSet_clicked()
+{
+    setWin = new SetDialog();
+    setWin->setWindowTitle(tr("帮助"));
+    setWin->show();
+}
+
+
+void MainWindow::on_btnDefault_clicked()
+{
+    ui->labelInfo->clear();
+    ui->lineEditIp->setText(tr("152.16.17.134"));
+    ui->lineEditPort->setText(tr("8089"));
+
+    ui->comboBox->setCurrentIndex(0);
+    ui->lineEditTitle->setText(tr("检验报告"));
+}
+//保存设置按钮
+void MainWindow::on_btnOk_clicked()
+{
+    QString ipStr = ui->lineEditIp->text();
+    QString portStr = ui->lineEditPort->text();
+
+    int paperType = ui->comboBox->currentIndex();
+    QString paperTitle = ui->lineEditTitle->text();
+
+    QSettings configIniWrite(configFilePath, QSettings::IniFormat);
+
+    configIniWrite.beginGroup("NET_SET");
+    configIniWrite.setValue("IP_SET", ipStr);
+    configIniWrite.setValue("PORT_SET", portStr);
+    configIniWrite.endGroup();
+
+    configIniWrite.beginGroup("PRINT_SET");
+    //0对应A4纸张，1对应A5纸张
+    configIniWrite.setValue("PAGE_SIZE", paperType);
+    configIniWrite.setValue("PRINT_TITLE", paperTitle);
+    configIniWrite.endGroup();
+
+}
+
